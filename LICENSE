@@ -1,0 +1,39 @@
+Bandpey GmbH Software License Agreement
+
+fine-grained-demand-forecasting-at-scale
+
+Copyright (2023) Bandpey GmbH
+
+This software ("Software"), an improvement upon the "demand-forecasting" solution, incorporates and builds upon technology from Databricks, Inc. ("Databricks"). Use of this Software is subject to the terms and conditions set forth in this License Agreement ("Agreement").
+
+Grant of License:
+
+Subject to the terms of this Agreement, Bandpey GmbH grants to the licensee ("Licensee") a non-exclusive, non-transferable, limited license to use the Software solely in connection with the Databricks Platform Services, as defined in the Databricks License Agreement. This use must also comply with the terms set forth by Bandpey GmbH herein.
+
+Restrictions:
+
+The Software must not be used independently of the Databricks platform services. Use of the Software is contingent upon Licensee's active and compliant use of Databricks Platform Services under a separate agreement with Databricks, Inc.
+
+Any use of the Software must include prominent mention of Bandpey GmbH and Databricks, Inc., acknowledging the contributions and copyright of both entities.
+
+The Licensee may not use the Software in a manner that competes with or substitutes the Databricks Platform Services.
+
+Derivative Works: The Licensee is prohibited from modifying, translating, reverse engineering, decompiling, disassembling, or creating derivative works based on the Software without prior written consent from Bandpey GmbH, except to the extent that such actions are expressly permitted by applicable law notwithstanding this limitation.
+
+Reference to Databricks License:
+
+This Agreement incorporates by reference the terms and conditions of the Databricks license agreement concerning the use of Databricks' solutions and services. Licensee's use of the Software must not conflict with any terms and conditions of the Databricks license agreement, including but not limited to the use, confidentiality, and termination provisions.
+
+Disclaimer of Warranty:
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL BANDPEY GMBH OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Termination:
+
+This Agreement is effective until terminated. It will terminate automatically without notice from Bandpey GmbH if Licensee fails to comply with any provision contained herein. Upon termination, Licensee must destroy all copies of the Software and all of its component parts.
+
+General:
+
+This Agreement constitutes the entire agreement between the parties concerning the subject matter hereof. This Agreement may only be modified by a written amendment signed by an authorized executive of Bandpey GmbH.
+
+By using the Software, Licensee agrees to be bound by the terms of this Agreement.
