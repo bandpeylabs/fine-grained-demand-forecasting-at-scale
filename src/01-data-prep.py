@@ -68,4 +68,113 @@ rawTrainDF = (spark.read
 
 # COMMAND ----------
 
+rawTestDF = (spark.read
+  .format("csv") 
+  .option("header", True) 
+  .schema(rawSchema)
+  .load(rawTestDataPath))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Preview the first 5 lines to make sure that your data loaded correctly.
+
+# COMMAND ----------
+
+display(rawTrainDF.head(5))
+
+# COMMAND ----------
+
+display(rawTestDF)
+
+# COMMAND ----------
+
+# MAGIC
+# MAGIC %md
+# MAGIC ## Create Training and Test Sets
+# MAGIC
+# MAGIC The test data has all `date` and `store` fields as `null` for easier prediction and evaluation it is better to construct the test set ourselves.
+# MAGIC
+# MAGIC We'll hold out a month of data for our test set.
+# MAGIC
+# MAGIC Start by finding the max date for the data.
+
+# COMMAND ----------
+
+import pyspark.sql.functions as F
+
+display(rawTrainDF.select(F.max("date")))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Create 2 new DataFrames:
+# MAGIC - `trainDF`: all but the last month of data
+# MAGIC - `testDF`: the date for December 2017
+
+# COMMAND ----------
+
+
+trainDF = rawTrainDF.filter(F.col("date") < "2017-12-01")
+testDF = rawTrainDF.filter(F.col("date") >= "2017-12-01")
+
+print(f"Our training set represents {trainDF.count() / rawTrainDF.count() * 100:.2f}% of the total data")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Save Datasets
+# MAGIC
+# MAGIC Registering data as a table provides access to queries with SQL and persists transformed data between notebooks.
+
+# COMMAND ----------
+
+tableName_train = "train"
+path_train = "mnt/demand_forecasting/train"
+
+tableName_test = "test"
+path_test = "mnt/demand_forecasting/test"
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Run the cell below to recursively delete your output directory and drop all tables if re-executing your save logic.
+
+# COMMAND ----------
+
+dbutils.fs.rm("mnt/demand_forecasting/", recurse=True)
+spark.sql(f"DROP DATABASE IF EXISTS {database} CASCADE")
+spark.sql(f"CREATE DATABASE IF NOT EXISTS {database}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC
+# MAGIC The function will create an unmanaged table using Delta Lake and accept three arguments:
+# MAGIC - a DataFrame
+# MAGIC - a path
+# MAGIC - a table name
+
+# COMMAND ----------
+
+from pyspark.sql import DataFrame
+
+def saveDeltaTable(df:DataFrame, path:str, tableName:str):
+  (df.write
+    .format("delta")
+    .option("path", path)
+    .saveAsTable(tableName)
+  )
+
+# COMMAND ----------
+
+saveDeltaTable(trainDF, path_train, tableName_train)
+saveDeltaTable(testDF, path_test, tableName_test)
+
+# COMMAND ----------
+
+dbutils.fs.ls(path_train)
+
+# COMMAND ----------
+
 
