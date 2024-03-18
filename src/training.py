@@ -131,27 +131,32 @@ def get_forecast_sequential(store_item_pd, days_to_forecast):
 
 # COMMAND ----------
 
+import pandas as pd  # Ensure pandas is imported
+
 # assemble historical dataset
 train_pd = trainDF.toPandas()
 
+# Initialize an empty DataFrame for accumulating results, if not done earlier
+store_item_accum_pd = pd.DataFrame()
+
 # for each store-item combination:
 for i, store_item in enumerate(store_items):
-  print(f"Run {i+1} of {len(store_items)}")
-  
-  # extract data subset for this store and item
-  store_item_train_pd = train_pd[ 
-    (train_pd['store']==store_item['store']) & 
-    (train_pd['item']==store_item['item']) 
+    print(f"Run {i+1} of {len(store_items)}")
+    
+    # extract data subset for this store and item
+    store_item_train_pd = train_pd[ 
+        (train_pd['store'] == store_item['store']) & 
+        (train_pd['item'] == store_item['item']) 
     ].dropna()
-  
-  # fit model on store-item subset and produce forecast
-  store_item_forecast_pd = get_forecast_sequential(store_item_train_pd, days_to_forecast=30)
-   
-  # concatonate forecasts to build a single resultset
-  if i>0:
-    store_item_accum_pd = store_item_accum_pd.append(store_item_forecast_pd, sort=False)
-  else:
-    store_item_accum_pd = store_item_forecast_pd
+    
+    # fit model on store-item subset and produce forecast
+    store_item_forecast_pd = get_forecast_sequential(store_item_train_pd, days_to_forecast=30)
+     
+    # concatenate forecasts to build a single resultset
+    store_item_accum_pd = pd.concat([store_item_accum_pd, store_item_forecast_pd], ignore_index=True)
+
+# At this point, store_item_accum_pd contains all the concatenated forecasts.
+
 
 # COMMAND ----------
 
