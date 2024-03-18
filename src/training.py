@@ -160,4 +160,27 @@ for i, store_item in enumerate(store_items):
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC We can quickly see that while calculating predictions for each store-item pair is fairly speedy, even 500 of these models will take roughly 2 minutes. For retailers with many thousands of items over many thousands of stores, this is not a sustainable approach.
+
+# COMMAND ----------
+
+display(store_item_accum_pd)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC While this produces the results we're after, the time it's taking to do so is not supportable. The reliability of timeseries forecasts degrades over time.  We need to generate forecasts far enough out to be actionable but not so far out that they are untrustworthy. For many organizations, this means we need generate weekly, daily or even hourly forecasts based on the latest historical data.  When we consider that a given store may contain 10s or 100s of 1000s of products and then multiply this by the number of stores for which we are generating forecasts, we must have a means to scale this work; processing that volume of data sequentially just isn't a viable solution.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Generating Store-Item Level Forecasts in Parallel
+# MAGIC
+# MAGIC Leveraging Spark and Databricks, we can easily solve this problem.  Instead of iterating over the set of store-item combinations, we will simply group our data by store and item, forcing store-item combinations to be partitioned across the resources in our cluster. To each store-item grouping, we will apply a function, similar to what we did before, to generate a forecast for each combination. The result will be a unified dataset, addressable as a Spark DataFrame.
+# MAGIC
+# MAGIC To get us started, let's re-write our forecast-generating function so that it may be applied to a Spark DataFrame. What you'll notice is that we are defining this function as a [pandas Grouped Map](https://docs.databricks.com/spark/latest/spark-sql/pandas-function-apis.html#grouped-map) which enables the efficient application of pandas functionality to grouped data in a Spark DataFrame.  But despite the slightly different function signature (which requires us to pre-define the structure of the pandas DataFrame that this function will produce), the internal logic is largely the same as the previous function.
+
+# COMMAND ----------
+
 
