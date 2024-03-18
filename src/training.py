@@ -121,4 +121,38 @@ def get_forecast_sequential(store_item_pd, days_to_forecast):
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC Now we can iterate over these store-item combinations, generating a forecast for each.
+# MAGIC
+# MAGIC A few things to note about this operation:
+# MAGIC 1. We are training a single model at a time. With 500 store-item pairs, we will need to wait for the serial execution of 500 models.
+# MAGIC 1. By default, Python code will execute on the _driver node only_. This is identical to executing on a single VM.
+# MAGIC 1. Some CPU on the driver will be reserved for Databricks tasks, such as managing the metastore. You can track CPU utilization using the
+
+# COMMAND ----------
+
+# assemble historical dataset
+train_pd = trainDF.toPandas()
+
+# for each store-item combination:
+for i, store_item in enumerate(store_items):
+  print(f"Run {i+1} of {len(store_items)}")
+  
+  # extract data subset for this store and item
+  store_item_train_pd = train_pd[ 
+    (train_pd['store']==store_item['store']) & 
+    (train_pd['item']==store_item['item']) 
+    ].dropna()
+  
+  # fit model on store-item subset and produce forecast
+  store_item_forecast_pd = get_forecast_sequential(store_item_train_pd, days_to_forecast=30)
+   
+  # concatonate forecasts to build a single resultset
+  if i>0:
+    store_item_accum_pd = store_item_accum_pd.append(store_item_forecast_pd, sort=False)
+  else:
+    store_item_accum_pd = store_item_forecast_pd
+
+# COMMAND ----------
+
 
