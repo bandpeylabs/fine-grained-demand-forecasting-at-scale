@@ -183,4 +183,57 @@ display(store_item_accum_pd)
 
 # COMMAND ----------
 
+# Update the import statement from fbprophet to prophet
+from prophet import Prophet
+
+# structure of udf result set
+result_schema = """
+  store INT,
+  item INT,
+  ds DATE,
+  yhat FLOAT,
+  yhat_lower FLOAT,
+  yhat_upper FLOAT
+"""
+
+# get forecast
+def get_forecast_spark(keys, grouped_pd):
+  
+    # drop nan records
+    grouped_pd = grouped_pd.dropna()
+  
+    # identify store and item
+    store = keys[0]
+    item = keys[1]
+    days_to_forecast = keys[2]
+  
+    # configure model
+    model = Prophet(
+        interval_width=0.95,
+        growth='linear',
+        daily_seasonality=False,
+        weekly_seasonality=True,
+        yearly_seasonality=True,
+        seasonality_mode='multiplicative'
+    )
+  
+    # train model
+    model.fit(grouped_pd.rename(columns={'date':'ds', 'sales':'y'})[['ds', 'y']])
+  
+    # make forecast
+    future_pd = model.make_future_dataframe(
+        periods=days_to_forecast, 
+        freq='d', 
+        include_history=False
+    )
+  
+    # retrieve forecast
+    forecast_pd = model.predict(future_pd)
+  
+    # assign store and item to group results
+    forecast_pd['store'] = store
+    forecast_pd['item'] = item
+  
+    # return results
+    return forecast_pd[['store', 'item', 'ds', 'yhat', 'yhat_lower', 'yhat_upper']]
 
