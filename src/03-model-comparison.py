@@ -231,4 +231,76 @@ allocatedDF = (item_accum_spark
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ## Calculate Performance Metrics
+# MAGIC
+# MAGIC Because we are automating the generation of forecasts, it is important we capture some data with which we can evaluate their reliability. Commonly used metrics include Mean Squared Error (MSE), Root Mean Squared Error (RMSE), and Mean Absolute Error (MAE).  We will calculate all of these for each store-item forecast. To do this, we will need another function that we will apply to our forecast dataset.
 
+# COMMAND ----------
+
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+
+from math import sqrt
+
+import numpy as np
+import pandas as pd
+
+# define evaluation metrics generation function
+eval_schema = """
+  store INT,
+  item INT,
+  mse FLOAT,
+  rmse FLOAT,
+  mae FLOAT,
+  model STRING
+"""
+
+def evaluate_forecast(keys, forecast_pd):
+  
+  # get store & item in incoming data set
+  store = int(keys[0])
+  item = int(keys[1])
+  model = keys[2]
+  
+  # MSE & RMSE
+  mse = mean_squared_error( forecast_pd['y'], forecast_pd['yhat'] )
+  rmse = sqrt(mse)
+  
+  # MAE
+  mae = mean_absolute_error( forecast_pd['y'], forecast_pd['yhat'] )
+  
+  # assemble result set
+  results = {'store':[store], 'item':[item], 'mse':[mse], 'rmse':[rmse], 'mae':[mae], "model":[model]}
+  return pd.DataFrame( data=results )
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC We use `applyInPandas` so that we can assess performance for each store-item pair.
+
+# COMMAND ----------
+
+storeItemMetrics = (spark.table("pred_overview")
+  .select("store", "item", "y", "yhat")
+  .groupBy("store", "item", F.lit("store-item-30day").alias("model"))
+  .applyInPandas(evaluate_forecast, schema=eval_schema))
+
+# COMMAND ----------
+
+display(storeItemMetrics)
+
+# COMMAND ----------
+
+aggItemMetrics = (spark.table("pred_overview")
+  .select("store", "item", "y", F.col("yhat_agg").alias("yhat"))
+  .groupBy("store", "item", F.lit("agg-item").alias("model"))
+  .applyInPandas(evaluate_forecast, schema=eval_schema))
+
+# COMMAND ----------
+
+display(aggItemMetrics)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC All of this is not to say that store-item level forecasting is always the right strategy (just like we aren't stating that FB Prophet is the right forecasting tool for every scenario).  What we are saying is that we want the option to explore a variety of forecasting strategies (and techniques).  In the past, computational limitations prohibited this but those days are behind us.
