@@ -292,4 +292,15 @@ display(
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ## Save Predictions Using Delta Lake
+# MAGIC
+# MAGIC In a later notebook, we'll discuss how we might design an idempotent system to store these values in a consumable fashion while maintaining historic predictions. For now, we'll save out our predictions as a Delta Lake table so they can be referenced in later notebooks.
 
+# COMMAND ----------
+
+(store_item_accum_spark.write
+  .format("delta")
+  .option("path", "/mnt/demand_forecasting/store_item_preds")
+  .saveAsTable("store_item_preds")
+)
