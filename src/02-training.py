@@ -237,3 +237,59 @@ def get_forecast_spark(keys, grouped_pd):
     # return results
     return forecast_pd[['store', 'item', 'ds', 'yhat', 'yhat_lower', 'yhat_upper']]
 
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC With our function defined, we can now group our data and apply the function to each group to generate a store-item forecast.
+# MAGIC
+# MAGIC Passing the literal value `30` as a positional in our `groupBy` statement allows us to pass parameters to the Pandas grouped map function.
+
+# COMMAND ----------
+
+# configure distribution target for groupBy
+spark.conf.set("spark.sql.shuffle.partitions", 500 ) 
+# the hardcoded value is based on our knowledge of the data
+# this is not necessarily a best practice in all scenarios
+
+# generate forecasts
+# the days_to_forecast field is used to overcome inability to pass params to pandas udf
+store_item_accum_spark = (
+  trainDF
+    .groupBy('store','item', F.lit(30).alias('days_to_forecast'))
+    .applyInPandas(get_forecast_spark, schema=result_schema)
+  ).cache()
+
+# action to trigger end-to-end processing (for fair comparison to above)
+store_item_accum_spark.count()
+
+# display some results on screen
+display(store_item_accum_spark)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC The timings achieved by parallelizing the workload are much better than those achieved with sequential process.  What's nice is that as we add resources to the cluster, we can reduce the overall time required to perform the work.  Here are some sample timings achieved by running the above process on different sized clusters:
+# MAGIC
+# MAGIC |Cores per VM| Worker Count | Total Worker Cores |  Timing |
+# MAGIC |------------|--------------|--------------------|---------|
+# MAGIC | 4          | 2            |  8                 | 5.41 m  |
+# MAGIC | 4          | 3            | 12                 | 3.03 m  |
+# MAGIC | 4          | 4            | 16                 | 2.83 m  |
+# MAGIC | 4          | 6            | 24                 | 1.65 m  |
+# MAGIC | 4          | 8            | 32                 | 1.36 m  |
+# MAGIC
+# MAGIC Graphing this data, you can see the general trend as we scale-out the work:
+
+# COMMAND ----------
+
+display(
+  spark.createDataFrame( 
+    [(8, 5.41), (12, 3.03), (16, 2.83), (24, 1.65), (32, 1.36)], 
+    schema=['cores', 'minutes']
+    )
+  )
+
+# COMMAND ----------
+
+
