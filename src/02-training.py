@@ -183,7 +183,6 @@ display(store_item_accum_pd)
 
 # COMMAND ----------
 
-# Update the import statement from fbprophet to prophet
 from prophet import Prophet
 
 # structure of udf result set
