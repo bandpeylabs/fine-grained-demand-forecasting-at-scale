@@ -51,4 +51,106 @@ print(
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC Now we need a function which we can apply to our Spark DataFrame in order to generate our forecast.  We'll reuse the function we employed in notebook 2 for parallel model training and prediction.
+
+# COMMAND ----------
+
+from prophet import Prophet
+
+# structure of udf result set
+result_schema = """
+  store INT,
+  item INT,
+  ds DATE,
+  yhat FLOAT,
+  yhat_lower FLOAT,
+  yhat_upper FLOAT
+"""
+
+# get forecast
+def get_forecast_spark(keys, grouped_pd):
+  
+  # drop nan records
+  grouped_pd = grouped_pd.dropna()
+  
+  # identify store and item
+  store = keys[0]
+  item = keys[1]
+  days_to_forecast = keys[2]
+  
+  # configure model
+  model = Prophet(
+    interval_width=0.95,
+    growth='linear',
+    daily_seasonality=False,
+    weekly_seasonality=True,
+    yearly_seasonality=True,
+    seasonality_mode='multiplicative'
+    )
+  
+  # train model
+  model.fit( grouped_pd.rename(columns={'date':'ds', 'sales':'y'})[['ds','y']]  )
+  
+  # make forecast
+  future_pd = model.make_future_dataframe(
+    periods=days_to_forecast, 
+    freq='d', 
+    include_history=False
+    )
+  
+  # retrieve forecast
+  forecast_pd = model.predict( future_pd )
+  
+  # assign store and item to group results
+  forecast_pd['store']=store
+  forecast_pd['item']=item
+  
+  # return results
+  return forecast_pd[['store', 'item', 'ds', 'yhat', 'yhat_lower', 'yhat_upper']]
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Simulate Data Arrival
+# MAGIC
+# MAGIC One of the benefits of the ACID properties of Delta Lake is that newly arriving data will automatically be included in subsequent reads of a table. We'll take advantage of this behavior to load a new day of data for each model that we train.
+# MAGIC
+# MAGIC We'll start by loading our `train` and `test` tables. We'll create a new table `prod` for use in our simulation.
+
+# COMMAND ----------
+
+spark.sql("DROP TABLE IF EXISTS prod")
+dbutils.fs.rm("/mnt/demand_forecasting/prod", recurse=True)
+
+trainDF = spark.table("train")
+testDF = spark.table("test")
+(trainDF.write
+  .format("delta")
+  .mode("overwrite")
+  .option("path", "/mnt/demand_forecasting/prod")
+  .saveAsTable("prod"))
+prodDF = spark.table("prod")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Running the Simulation
+# MAGIC
+# MAGIC In this simulation, to maximize our accuracy, we will only predict sales for the next day. Prior to training our new model, we append the day's sales figures to our training data. This simulation represents the pattern that might be used for daily forecasting: after new data arrives, we run a job to forecast likely sales for the next day for each store, which then guides local distribution of goods from regional distribution centers.
+# MAGIC
+# MAGIC In this simulation, we'll combine [Delta Lake table versioning](https://docs.databricks.com/delta/delta-batch.html#query-an-older-snapshot-of-a-table-time-travel) with [MLflow experiment tracking](https://docs.databricks.com/applications/mlflow/tracking.html#notebook-experiments). This allows us to recreate the environment in which our model was trained for reproducible data science.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC The following cell is provided to reset the predictions.
+
+# COMMAND ----------
+
+# spark.sql("DROP TABLE IF EXISTS forecasts")
+# dbutils.fs.rm(userhome + '/demand/forecasts', True)
+
+# COMMAND ----------
+
 
