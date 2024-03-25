@@ -153,4 +153,150 @@ prodDF = spark.table("prod")
 
 # COMMAND ----------
 
+import mlflow
+import prophet
 
+fbprophet_version = prophet.__version__
+
+# increment the "current date" for which we are training
+for i, training_date in enumerate( daterange(date(2017,11,30), date(2017,12,7)) ):
+  
+  with mlflow.start_run():
+    date_string = date.strftime(training_date, '%Y-%m-%d')
+    print(date_string)
+
+    (testDF
+      .filter(F.col("date") == training_date)
+      .write
+      .format("delta")
+      .mode("append")
+      .saveAsTable("prod"))
+
+    data_version = spark.sql("DESCRIBE HISTORY prod").collect()[0]["version"]
+
+    mlflow.log_param("fbprophet_version", fbprophet_version)
+    mlflow.log_param("training_date", date_string)
+    mlflow.log_param("data_version", data_version)
+
+    # generate forecast for this data
+    forecastDF = (
+      prodDF
+        .groupBy('store', 'item', F.lit(1).alias('days_to_forecast'))
+        .applyInPandas(get_forecast_spark, result_schema)
+        .withColumn('training_date', F.lit(date.strftime(training_date, '%Y-%m-%d')).cast("date")
+        )).cache() 
+
+    # save data to delta
+    (forecastDF.write
+      .format('delta')
+      .partitionBy('training_date')
+      .mode('append')
+      .option("path", '/mnt/demand/forecasts')
+      .saveAsTable("forecasts"))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Evaluate Model Performance
+# MAGIC
+# MAGIC To evaluate our model performance, we'll bring in the function we used in the last notebook and add a couple of additional performance metrics.
+# MAGIC
+# MAGIC Prophet provides confidence intervals when making predictions. We'll use these confidence intervals to calculate two additional metrics. Rather than having an in-depth discussion on interval forecasts, we'll define these metrics as follows:
+# MAGIC - `accuracy`: the percentage that our prediction falls within the calculated prediction interval
+# MAGIC - `stocked`: the percentage that actual sales were lower than the high end of the prediction interval
+
+# COMMAND ----------
+
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+
+from math import sqrt
+
+import numpy as np
+import pandas as pd
+
+# define evaluation metrics generation function
+eval_schema = """
+  store INT,
+  item INT,
+  mse FLOAT,
+  rmse FLOAT,
+  mae FLOAT,
+  accuracy FLOAT,
+  stocked FLOAT,
+  model STRING
+"""
+
+def evaluate_forecast(keys, forecast_pd):
+  
+  # get store & item in incoming data set
+  store = int(keys[0])
+  item = int(keys[1])
+  model = keys[2]
+  
+  # MSE & RMSE
+  mse = mean_squared_error( forecast_pd['y'], forecast_pd['yhat'] )
+  rmse = sqrt(mse)
+  
+  # MAE
+  mae = mean_absolute_error( forecast_pd['y'], forecast_pd['yhat'] )
+  
+  # accuracy
+  accuracy = ((forecast_pd["yhat_lower"] < forecast_pd["y"]) & (forecast_pd["y"] < forecast_pd["yhat_upper"])).mean()
+  
+  # sufficicent stock
+  stocked = (forecast_pd["y"] < forecast_pd["yhat_upper"]).mean()
+  
+  # assemble result set
+  results = {'store':[store], 'item':[item], 'mse':[mse], 'rmse':[rmse], 'mae':[mae], 'accuracy':[accuracy], 'stocked':[stocked], "model":[model]}
+  return pd.DataFrame( data=results )
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC We'll perform an inner join between our forecasts and the test data to add our true sales a `y`.
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC CREATE OR REPLACE TEMP VIEW forecasts_y AS
+# MAGIC SELECT ds, training_date, a.store, a.item, yhat_lower, yhat_upper, yhat, sales AS y
+# MAGIC FROM forecasts a
+# MAGIC INNER JOIN test b
+# MAGIC ON date = ds AND a.store=b.store AND a.item=b.item
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC While each store-item pair actually represents a separate model, we'll report how our modeling technique is performing over time.
+
+# COMMAND ----------
+
+evalDF = (spark.table("forecasts_y")
+  .groupBy("store", "item", F.lit("daily"))
+  .applyInPandas(evaluate_forecast, schema = eval_schema))
+
+# COMMAND ----------
+
+display(evalDF)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC To get a more succinct snapshot of our model performance, we can calculate these metrics over our entire model.
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC SELECT SUM(CASE
+# MAGIC     WHEN (yhat_lower < y) AND (y < yhat_upper) THEN 1
+# MAGIC     ELSE 0 END) / COUNT(*) AS accuracy,
+# MAGIC   SUM(CASE
+# MAGIC     WHEN y < yhat_upper THEN 1
+# MAGIC     ELSE 0 END) / COUNT(*) AS stocked
+# MAGIC FROM forecasts_y
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC
+# MAGIC If we consider the 95% confidence interval as the range of likely sales per store-item combination, we note that in our models accurately forecast next-day sales around 88% of the time. Further, in over 99% of our predictions, the actual sales for an item at a given store were less than the the upper bound of our confidence interval. Stocking decisions on individual items will be guided by the policy of a retailer and take into account such things as perishability, profit margins, and the necessity of keeping staple goods in stock at all time. Combining these company policies with fine-grained predictions can serve to help retailers reduce waste and avoid lost sales.
