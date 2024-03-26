@@ -2,6 +2,10 @@
 
 This repository contains the codebase and architectural guidance for implementing Many-Models Machine Learning (ML) at scale, specifically tailored for demand forecasting applications. The architecture leverages Apache Spark, deployed on Azure Databricks, to facilitate extensive and complex data transformations required by certain demand forecasting solutions. Databricks offers a robust environment for handling the significant data processing demands of this application.
 
+## Overall Architecture
+
+![](./docs/images/mlops-overall-architecture-white-bg-v2.png)
+
 ## Key Challenges Addressed:
 
 ### 1. Model Catalog Management
@@ -35,10 +39,6 @@ The provided code and instructions prepare users to deploy a scalable demand for
 ## Getting Started
 
 To begin using this architecture for your demand forecasting needs, please follow the setup and deployment instructions provided in the subsequent sections. Ensure that your Azure Databricks environment is configured according to the prerequisites outlined, and familiarize yourself with Apache Spark's capabilities to maximize the effectiveness of your implementation.
-
-## Overall Architecture
-
-![](./docs/images/mlops-overall-architecture-white-bg-v2.png)
 
 ## CI/CD for Data Products (DataOps)
 
